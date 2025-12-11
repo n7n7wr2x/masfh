@@ -23,8 +23,8 @@ cp backend/.env.example backend/.env
 ### 2. تعديل متغيرات البيئة
 
 قم بتعديل `backend/.env` وإضافة:
-- بيانات Salla API
-- بيانات WhatsApp Business API
+- بيانات  API
+- بيانات   API
 
 ### 3. التشغيل بـ Docker
 
@@ -52,12 +52,12 @@ npm run dev
 
 ## الـ Webhooks
 
-### Salla Webhook
+###  Webhook
 ```
 POST http://your-domain.com/api/webhooks/salla
 ```
 
-### WhatsApp Webhook
+###  Webhook
 ```
 GET/POST http://your-domain.com/api/webhooks/whatsapp
 ```
