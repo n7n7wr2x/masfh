@@ -20,10 +20,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: salla-whatsapp-frontend
-          property: url
+        value: https://update-me-after-deploy.onrender.com
       # Placeholder vars - You must update these in dashboard
       - key: SALLA_CLIENT_ID
         value: change_me_in_dashboard
@@ -45,15 +42,9 @@ services:
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: NEXT_PUBLIC_BACKEND_URL
-        fromService:
-          type: web
-          name: salla-whatsapp-backend
-          property: url
+        value: https://update-me-after-deploy.onrender.com
       - key: NEXTAUTH_URL
-        fromService:
-          type: web
-          name: salla-whatsapp-frontend
-          property: url
+        value: https://update-me-after-deploy.onrender.com
 
 databases:
   - name: salla-whatsapp-db
