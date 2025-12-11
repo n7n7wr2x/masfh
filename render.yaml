@@ -57,6 +57,4 @@ services:
 
 databases:
   - name: salla-whatsapp-db
-    databaseName: salla_whatsapp
-    user: salla_user
     plan: free
