@@ -29,13 +29,17 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
+
+// Debug logging
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.url}`);
+  next();
+});
+
+// Allowing ALL origins for debugging
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL,
-    'https://salla-whatsapp-frontend.onrender.com',
-    'http://localhost:3000'
-  ],
-  credentials: true
+  origin: '*',
+  credentials: false // Must be false when origin is '*'
 }));
 
 // Rate limiting

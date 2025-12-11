@@ -3,6 +3,8 @@ import axios from 'axios'
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 const API_URL = `${BASE_URL.replace(/\/$/, '')}/api`
 
+console.log('🔌 API Connected to:', API_URL);
+
 const api = axios.create({
     baseURL: API_URL,
     headers: {
