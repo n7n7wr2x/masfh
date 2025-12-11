@@ -55,6 +55,46 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Setup Admin Route (Temporary)
+app.get('/api/setup-admin', async (req, res) => {
+  const prisma = require('./lib/prisma');
+  const bcrypt = require('bcryptjs');
+
+  try {
+    const email = 'admin@example.com';
+    const password = 'password123';
+
+    // Check connection first
+    await prisma.$connect();
+
+    let user = await prisma.user.findUnique({ where: { email } });
+
+    if (user) {
+      return res.json({ success: true, message: 'Admin user already exists', user: user.email });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name: 'Super Admin',
+        role: 'SUPER_ADMIN',
+      },
+    });
+
+    res.json({ success: true, message: 'Admin created successfully', user: user.email });
+
+  } catch (error) {
+    console.error('Setup Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/salla', sallaRoutes);
