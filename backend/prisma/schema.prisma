@@ -1,0 +1,514 @@
+// Prisma Schema for Salla WhatsApp Integration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USERS & AUTH ====================
+
+enum UserRole {
+  SUPER_ADMIN
+  MERCHANT
+  STAFF
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  tempPassword  String?   // Temporary password for admin to see (cleared after first login)
+  name          String
+  role          UserRole  @default(MERCHANT)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  stores        Store[]
+  staffStores   StoreStaff[]
+  
+  @@map("users")
+}
+
+// ==================== STORES ====================
+
+model Store {
+  id                    String    @id @default(uuid())
+  userId                String
+  name                  String
+  
+  // Salla Integration
+  sallaStoreId          String?   @unique
+  sallaAccessToken      String?
+  sallaRefreshToken     String?
+  sallaTokenExpiresAt   DateTime?
+  
+  // WhatsApp Integration
+  whatsappPhoneId       String?
+  whatsappBusinessId    String?
+  whatsappAccessToken   String?
+  
+  // Settings
+  settings              Json      @default("{}")
+  isActive              Boolean   @default(true)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  staff                 StoreStaff[]
+  orders                Order[]
+  abandonedCarts        AbandonedCart[]
+  campaigns             Campaign[]
+  templates             Template[]
+  notifications         Notification[]
+  subscription          Subscription?
+  conversations         Conversation[]
+  contacts              Contact[]
+  
+  @@map("stores")
+}
+
+model StoreStaff {
+  id        String   @id @default(uuid())
+  storeId   String
+  userId    String
+  
+  createdAt DateTime @default(now())
+  
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([storeId, userId])
+  @@map("store_staff")
+}
+
+// ==================== CONTACTS ====================
+
+model Contact {
+  id            String    @id @default(uuid())
+  storeId       String
+  
+  // Contact info
+  phone         String
+  name          String?
+  email         String?
+  
+  // Source tracking
+  source        String    @default("whatsapp") // whatsapp, order, manual
+  
+  // Stats
+  totalOrders   Int       @default(0)
+  totalSpent    Float     @default(0)
+  messagesCount Int       @default(0)
+  
+  // Last interaction
+  lastContactAt DateTime?
+  
+  // Tags (JSON array for flexible tagging)
+  tags          Json      @default("[]")
+  notes         String?
+  
+  isBlocked     Boolean   @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  store         Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  @@unique([storeId, phone])
+  @@map("contacts")
+}
+
+// ==================== ORDERS ====================
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  storeId         String
+  sallaOrderId    String
+  
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  
+  status          OrderStatus @default(PENDING)
+  total           Decimal     @db.Decimal(10, 2)
+  currency        String      @default("SAR")
+  
+  items           Json        @default("[]")
+  shippingAddress Json?
+  trackingNumber  String?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  store           Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  notifications   Notification[]
+  
+  @@unique([storeId, sallaOrderId])
+  @@map("orders")
+}
+
+// ==================== ABANDONED CARTS ====================
+
+model AbandonedCart {
+  id              String    @id @default(uuid())
+  storeId         String
+  sallaCartId     String?
+  
+  customerName    String?
+  customerPhone   String
+  customerEmail   String?
+  
+  cartValue       Decimal   @db.Decimal(10, 2)
+  currency        String    @default("SAR")
+  items           Json      @default("[]")
+  
+  remindersSent   Int       @default(0)
+  lastReminderAt  DateTime?
+  recoveredAt     DateTime?
+  
+  abandonedAt     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  store           Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  notifications   Notification[]
+  
+  @@map("abandoned_carts")
+}
+
+// ==================== CAMPAIGNS ====================
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum CampaignType {
+  PROMOTIONAL
+  ANNOUNCEMENT
+  CUSTOM
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  storeId         String
+  
+  name            String
+  type            CampaignType   @default(PROMOTIONAL)
+  templateId      String?
+  
+  // Audience
+  audience        Json           @default("{}")
+  totalRecipients Int            @default(0)
+  
+  // Scheduling
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  // Stats
+  sentCount       Int            @default(0)
+  deliveredCount  Int            @default(0)
+  readCount       Int            @default(0)
+  failedCount     Int            @default(0)
+  
+  status          CampaignStatus @default(DRAFT)
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  // Relations
+  store           Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  template        Template?      @relation(fields: [templateId], references: [id])
+  messages        CampaignMessage[]
+  
+  @@map("campaigns")
+}
+
+model CampaignMessage {
+  id          String   @id @default(uuid())
+  campaignId  String
+  phone       String
+  status      String   @default("pending")
+  sentAt      DateTime?
+  error       String?
+  
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  @@map("campaign_messages")
+}
+
+// ==================== TEMPLATES ====================
+
+enum TemplateType {
+  ORDER_CONFIRMATION
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  ABANDONED_CART
+  PROMOTIONAL
+  CUSTOM
+}
+
+enum TemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Template {
+  id                  String         @id @default(uuid())
+  storeId             String
+  
+  name                String
+  type                TemplateType
+  whatsappTemplateId  String?
+  
+  // Content
+  content             String
+  variables           Json           @default("[]")
+  
+  status              TemplateStatus @default(PENDING)
+  isActive            Boolean        @default(true)
+  
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  
+  // Relations
+  store               Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  campaigns           Campaign[]
+  notifications       Notification[]
+  
+  @@map("templates")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+enum NotificationType {
+  ORDER_UPDATE
+  ABANDONED_CART
+  CAMPAIGN
+  CUSTOM
+}
+
+enum NotificationStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Notification {
+  id              String             @id @default(uuid())
+  storeId         String
+  
+  phone           String
+  type            NotificationType
+  templateId      String?
+  
+  // References
+  orderId         String?
+  abandonedCartId String?
+  
+  // Meta
+  variables       Json               @default("{}")
+  whatsappMsgId   String?
+  
+  status          NotificationStatus @default(PENDING)
+  error           String?
+  
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  
+  // Relations
+  store           Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  template        Template?          @relation(fields: [templateId], references: [id])
+  order           Order?             @relation(fields: [orderId], references: [id])
+  abandonedCart   AbandonedCart?     @relation(fields: [abandonedCartId], references: [id])
+  
+  @@map("notifications")
+}
+
+// ==================== CONVERSATIONS ====================
+
+model Conversation {
+  id              String    @id @default(uuid())
+  storeId         String
+  
+  // Customer info
+  customerPhone   String
+  customerName    String?
+  
+  // Last message preview
+  lastMessage     String?
+  lastMessageAt   DateTime?
+  
+  // Status
+  unreadCount     Int       @default(0)
+  isArchived      Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  store           Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  messages        Message[]
+  
+  @@unique([storeId, customerPhone])
+  @@map("conversations")
+}
+
+model Message {
+  id              String    @id @default(uuid())
+  conversationId  String
+  
+  // Message content
+  direction       String    // "inbound" or "outbound"
+  type            String    @default("text") // text, template, image, document, etc
+  content         String?
+  templateName    String?
+  templateVars    Json?
+  
+  // WhatsApp IDs
+  whatsappMsgId   String?
+  
+  // Status (for outbound)
+  status          String    @default("sent") // sent, delivered, read, failed
+  error           String?
+  
+  // Timestamps
+  sentAt          DateTime  @default(now())
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  
+  createdAt       DateTime  @default(now())
+  
+  // Relations
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@map("messages")
+}
+
+// ==================== AUDIT LOG ====================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  storeId   String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json     @default("{}")
+  ipAddress String?
+  
+  createdAt DateTime @default(now())
+  
+  @@map("audit_logs")
+}
+
+// ==================== WEBHOOK LOGS ====================
+
+model WebhookLog {
+  id          String   @id @default(uuid())
+  source      String   // "salla" | "whatsapp"
+  event       String
+  merchantId  String?
+  payload     Json
+  processed   Boolean  @default(false)
+  error       String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("webhook_logs")
+}
+
+// Subscription Plans
+model Plan {
+  id              String   @id @default(uuid())
+  name            String
+  nameAr          String   // Arabic name
+  description     String?
+  descriptionAr   String?  // Arabic description
+  
+  // Pricing
+  price           Float    @default(0)
+  currency        String   @default("SAR")
+  billingPeriod   String   @default("monthly") // monthly, yearly
+  
+  // Limits
+  messagesLimit   Int      @default(100)   // Messages per month
+  templatesLimit  Int      @default(5)     // Number of templates
+  campaignsLimit  Int      @default(2)     // Number of campaigns
+  
+  // Features (JSON array of feature keys)
+  features        Json     @default("[]")
+  
+  // Status
+  isActive        Boolean  @default(true)
+  isDefault       Boolean  @default(false) // Default plan for new stores
+  sortOrder       Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  subscriptions   Subscription[]
+  
+  @@map("plans")
+}
+
+model Subscription {
+  id              String    @id @default(uuid())
+  storeId         String
+  planId          String
+  
+  // Usage tracking
+  messagesUsed    Int       @default(0)
+  
+  // Subscription period
+  startDate       DateTime  @default(now())
+  endDate         DateTime?
+  
+  // Status
+  status          String    @default("active") // active, cancelled, expired
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  store           Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  plan            Plan      @relation(fields: [planId], references: [id])
+  
+  @@unique([storeId])
+  @@map("subscriptions")
+}
