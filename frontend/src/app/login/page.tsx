@@ -25,7 +25,8 @@ export default function LoginPage() {
             toast.success('تم تسجيل الدخول بنجاح')
             router.push('/dashboard')
         } catch (error: any) {
-            toast.error(error.message || 'خطأ في تسجيل الدخول')
+            console.error('Login error:', error);
+            toast.error(error.response?.data?.error || error.message || 'خطأ غير متوقع: ' + JSON.stringify(error))
         } finally {
             setLoading(false)
         }
