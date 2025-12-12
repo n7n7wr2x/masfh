@@ -28,9 +28,58 @@ export default function WhatsAppSettingsPage() {
         businessId: ''
     })
 
+
+
     useEffect(() => {
         fetchStores()
+
+        // Initialize Facebook SDK
+        // @ts-ignore
+        window.fbAsyncInit = function () {
+            // @ts-ignore
+            FB.init({
+                appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID, // Use env var
+                autoLogAppEvents: true,
+                xfbml: true,
+                version: 'v18.0'
+            });
+        };
     }, [])
+
+    const launchFacebookLogin = () => {
+        setSaving(true)
+        // @ts-ignore
+        FB.login(function (response) {
+            if (response.authResponse) {
+                console.log('FB Login Success:', response);
+                const accessToken = response.authResponse.accessToken;
+                handleFacebookConnect(accessToken);
+            } else {
+                console.log('User cancelled login or did not fully authorize.');
+                setSaving(false)
+            }
+        }, {
+            scope: 'whatsapp_business_management,whatsapp_business_messaging',
+            extras: {
+                feature: 'whatsapp_embedded_signup',
+            }
+        });
+    }
+
+    const handleFacebookConnect = async (accessToken: string) => {
+        if (!currentStore?.id) return
+
+        try {
+            await whatsappApi.connect(currentStore.id, { accessToken })
+
+            setTestResult({ success: true, message: 'تم ربط واتساب بنجاح!' })
+            fetchStatus()
+        } catch (error: any) {
+            setTestResult({ success: false, message: error.message || 'حدث خطأ في الاتصال' })
+        } finally {
+            setSaving(false)
+        }
+    }
 
     useEffect(() => {
         if (currentStore?.id) {
@@ -43,14 +92,6 @@ export default function WhatsAppSettingsPage() {
         try {
             const data = await whatsappApi.getStatus(currentStore.id)
             setStatus(data)
-
-            if (data.connected) {
-                setFormData({
-                    phoneNumberId: data.phoneId || '',
-                    businessAccountId: data.businessId || '',
-                    accessToken: '••••••••••••••••' // Don't show actual token
-                })
-            }
         } catch (error) {
             console.error('Failed to fetch status:', error)
         } finally {
@@ -132,10 +173,8 @@ export default function WhatsAppSettingsPage() {
             {/* Connection Status */}
             <div className="card mb-6">
                 <div className="flex items-center gap-4">
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${status.connected ? 'bg-green-500/20' : 'bg-gray-500/20'
-                        }`}>
-                        <MessageCircle className={`w-8 h-8 ${status.connected ? 'text-green-400' : 'text-gray-400'
-                            }`} />
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${status.connected ? 'bg-green-500/20' : 'bg-gray-500/20'}`}>
+                        <MessageCircle className={`w-8 h-8 ${status.connected ? 'text-green-400' : 'text-gray-400'}`} />
                     </div>
                     <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -171,107 +210,43 @@ export default function WhatsAppSettingsPage() {
                 </div>
             </div>
 
-            {/* Setup Guide */}
             {!status.connected && (
-                <div className="card mb-6 bg-blue-500/10 border border-blue-500/30">
-                    <h3 className="text-blue-400 font-semibold mb-3">📋 خطوات الربط:</h3>
-                    <ol className="space-y-2 text-gray-300 text-sm">
-                        <li>1. اذهب لـ <a href="https://developers.facebook.com" target="_blank" className="text-blue-400 hover:underline">Meta Developers</a></li>
-                        <li>2. أنشئ تطبيق جديد واختر "Business"</li>
-                        <li>3. أضف منتج "WhatsApp" للتطبيق</li>
-                        <li>4. اربط رقم واتساب الخاص بك</li>
-                        <li>5. انسخ البيانات المطلوبة أدناه</li>
-                    </ol>
-                    <a
-                        href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
-                        target="_blank"
-                        className="inline-flex items-center gap-2 text-blue-400 text-sm mt-4 hover:underline"
+                <div className="card mb-6 text-center py-10">
+                    <div className="mb-6">
+                        <h3 className="text-xl font-bold text-white mb-2">ربط واتساب للأعمال</h3>
+                        <p className="text-gray-400">
+                            اضغط على الزر أدناه لتسجيل الدخول بحساب فيسبوك واختيار رقم الواتساب الخاص بك.
+                        </p>
+                    </div>
+
+                    <button
+                        onClick={launchFacebookLogin}
+                        disabled={saving}
+                        className="bg-[#1877F2] hover:bg-[#166fe5] text-white px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-3 mx-auto transition-all transform hover:scale-105"
                     >
-                        <ExternalLink className="w-4 h-4" />
-                        دليل الإعداد الكامل
-                    </a>
+                        {saving ? (
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                        ) : (
+                            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.791-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                            </svg>
+                        )}
+                        تسجيل الدخول بفيسبوك
+                    </button>
+
+                    <p className="text-gray-500 text-xs mt-4">
+                        سيتم توجيهك إلى فيسبوك للموافقة على الأذونات المطلوبة.
+                    </p>
+
+                    {testResult && !testResult.success && (
+                        <div className="mt-4 text-red-400 bg-red-500/10 p-2 rounded">
+                            {testResult.message}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Connection Form */}
-            <form onSubmit={handleConnect} className="card mb-6">
-                <h3 className="text-lg font-semibold text-white mb-4">بيانات الاتصال</h3>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-gray-300 text-sm mb-2">Phone Number ID</label>
-                        <input
-                            type="text"
-                            value={formData.phoneNumberId}
-                            onChange={(e) => setFormData({ ...formData, phoneNumberId: e.target.value })}
-                            className="input w-full"
-                            placeholder="مثال: 123456789012345"
-                            required
-                        />
-                        <p className="text-gray-500 text-xs mt-1">
-                            تجده في: WhatsApp → API Setup → Phone number ID
-                        </p>
-                    </div>
-
-                    <div>
-                        <label className="block text-gray-300 text-sm mb-2">WhatsApp Business Account ID</label>
-                        <input
-                            type="text"
-                            value={formData.businessAccountId}
-                            onChange={(e) => setFormData({ ...formData, businessAccountId: e.target.value })}
-                            className="input w-full"
-                            placeholder="مثال: 109876543210987"
-                        />
-                        <p className="text-gray-500 text-xs mt-1">
-                            تجده في: WhatsApp → API Setup → WhatsApp Business Account ID
-                        </p>
-                    </div>
-
-                    <div>
-                        <label className="block text-gray-300 text-sm mb-2">Access Token</label>
-                        <div className="relative">
-                            <input
-                                type={showToken ? 'text' : 'password'}
-                                value={formData.accessToken}
-                                onChange={(e) => setFormData({ ...formData, accessToken: e.target.value })}
-                                className="input w-full pr-12"
-                                placeholder="EAAG..."
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowToken(!showToken)}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                            >
-                                {showToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                            </button>
-                        </div>
-                        <p className="text-gray-500 text-xs mt-1">
-                            أنشئ Permanent Token من: Business Settings → System Users
-                        </p>
-                    </div>
-                </div>
-
-                {testResult && (
-                    <div className={`mt-4 p-3 rounded-lg ${testResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
-                        {testResult.message}
-                    </div>
-                )}
-
-                <button
-                    type="submit"
-                    disabled={saving}
-                    className="btn-primary w-full mt-6 flex items-center justify-center gap-2"
-                >
-                    {saving ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                        <Save className="w-5 h-5" />
-                    )}
-                    {status.connected ? 'تحديث البيانات' : 'ربط واتساب'}
-                </button>
-            </form>
+            <script async defer crossOrigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
 
             {/* Test Message */}
             {status.connected && (

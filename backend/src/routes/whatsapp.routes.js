@@ -10,22 +10,52 @@ const { asyncHandler } = require('../middleware/error.middleware');
  * @desc    Connect WhatsApp Business to store
  */
 router.post('/connect/:storeId', authenticate, requireStoreAccess, asyncHandler(async (req, res) => {
-    const { phoneNumberId, businessAccountId, accessToken } = req.body;
+    const { accessToken } = req.body;
 
-    if (!phoneNumberId || !accessToken) {
-        return res.status(400).json({ error: 'جميع بيانات واتساب مطلوبة' });
+    if (!accessToken) {
+        return res.status(400).json({ error: 'Access Token مطلوب' });
     }
 
-    await prisma.store.update({
-        where: { id: req.params.storeId },
-        data: {
-            whatsappPhoneId: phoneNumberId,
-            whatsappBusinessId: businessAccountId,
-            whatsappAccessToken: accessToken
-        }
-    });
+    try {
+        // 1. Exchange for Long-Lived Token
+        const longToken = await whatsappService.exchangeLongLivedToken(accessToken);
 
-    res.json({ message: 'تم ربط واتساب بنجاح' });
+        // 2. Get WABA Details
+        const waba = await whatsappService.getWABA(longToken);
+        const wabaId = waba.id;
+
+        // 3. Get Phone Numbers
+        const phones = await whatsappService.getPhoneNumbers(wabaId, longToken);
+        if (!phones || phones.length === 0) {
+            return res.status(400).json({ error: 'لا يوجد أرقام هاتف في هذا الحساب' });
+        }
+
+        // Use the first verified number, or just the first one
+        const phoneNumber = phones[0];
+        const phoneId = phoneNumber.id;
+
+        // 4. Subscribe to Webhooks
+        await whatsappService.subscribeWabaToWebhooks(wabaId, longToken);
+
+        // 5. Save to Database
+        await prisma.store.update({
+            where: { id: req.params.storeId },
+            data: {
+                whatsappPhoneId: phoneId,
+                whatsappBusinessId: wabaId,
+                whatsappAccessToken: longToken
+            }
+        });
+
+        res.json({
+            message: 'تم ربط واتساب بنجاح',
+            phone: phoneNumber.display_phone_number
+        });
+
+    } catch (error) {
+        console.error('Connect Error:', error);
+        res.status(500).json({ error: error.message || 'فشل في عملية الربط' });
+    }
 }));
 
 /**

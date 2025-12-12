@@ -23,6 +23,10 @@ services:
         value: https://update-me-after-deploy.onrender.com
       - key: WHATSAPP_VERIFY_TOKEN
         value: salla_whatsapp_default_token
+      - key: FACEBOOK_APP_ID
+        value: change_me_in_dashboard
+      - key: FACEBOOK_APP_SECRET
+        value: change_me_in_dashboard
       - key: WHATSAPP_APP_SECRET
         value: change_me_in_dashboard
       # Placeholder vars - You must update these in dashboard

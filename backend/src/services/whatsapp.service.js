@@ -14,6 +14,82 @@ class WhatsAppService {
     }
 
     /**
+     * Exchange short-lived token for long-lived token
+     */
+    async exchangeLongLivedToken(shortToken) {
+        try {
+            const response = await axios.get(`${this.baseUrl}/oauth/access_token`, {
+                params: {
+                    grant_type: 'fb_exchange_token',
+                    client_id: process.env.FACEBOOK_APP_ID, // Must be added to env
+                    client_secret: process.env.FACEBOOK_APP_SECRET, // Must be added to env
+                    fb_exchange_token: shortToken
+                }
+            });
+            return response.data.access_token;
+        } catch (error) {
+            console.error('Token Exchange Error:', error.response?.data);
+            throw new Error('فشل في تحديث التوكن');
+        }
+    }
+
+    /**
+     * Get WABA Info from Token
+     */
+    async getWABA(token) {
+        try {
+            // First get user info to find accounts
+            const me = await axios.get(`${this.baseUrl}/me`, {
+                params: {
+                    fields: 'id,name,whatsapp_business_accounts',
+                    access_token: token
+                }
+            });
+
+            const accounts = me.data.whatsapp_business_accounts?.data;
+            if (!accounts || accounts.length === 0) {
+                throw new Error('لا يوجد حساب واتساب للأعمال مرتبط');
+            }
+
+            return accounts[0]; // Return first account
+        } catch (error) {
+            console.error('Get WABA Error:', error.response?.data);
+            throw error;
+        }
+    }
+
+    /**
+     * Get Phone Numbers for WABA
+     */
+    async getPhoneNumbers(wabaId, token) {
+        try {
+            const response = await axios.get(`${this.baseUrl}/${wabaId}/phone_numbers`, {
+                params: { access_token: token }
+            });
+            return response.data.data;
+        } catch (error) {
+            console.error('Get Phone Numbers Error:', error.response?.data);
+            throw error;
+        }
+    }
+
+    /**
+     * Subscribe App to WABA Webhooks
+     */
+    async subscribeWabaToWebhooks(wabaId, token) {
+        try {
+            await axios.post(`${this.baseUrl}/${wabaId}/subscribed_apps`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            return true;
+        } catch (error) {
+            console.error('Subscribe Webhook Error:', error.response?.data);
+            // Don't fail the whole process if this fails, just log it
+            return false;
+        }
+    }
+
+    /**
      * Send a template message
      */
     async sendTemplateMessage(store, phone, templateName, variables = []) {
