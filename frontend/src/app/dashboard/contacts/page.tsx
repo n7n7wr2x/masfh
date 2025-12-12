@@ -57,26 +57,9 @@ export default function ContactsPage() {
     }, [currentStore, search])
 
     const fetchContacts = async () => {
+        if (!currentStore?.id) return
         try {
             const data = await contactsApi.getAll(currentStore.id, 1, search)
-            // Note: The original fetch used search param which isn't fully supported in the simple getAll wrapper yet
-            // For now, let's keep it simple or update api.ts if search is critical. 
-            // Wait, I see I didn't add search to getAll in api.ts.
-            // Let's assume standard pagination for now, or I'll quickly fix api.ts next turn if needed.
-            // actually, let's look at the fetch: `${process.env.NEXT_PUBLIC_API_URL}/contacts/${currentStore?.id}?limit=50${searchParam}`
-            // My api.ts getAll takes (storeId, page). It doesn't take search. 
-            // I should have updated api.ts to support search. 
-            // I will use direct axios call for now OR update api.ts. 
-            // Updating api.ts is cleaner. I will do that in a separate step? 
-            // No, I can't leave broken code. 
-            // I'll use the getAll but I'll update api.ts in the NEXT step or previous? 
-            // I already updated api.ts. It only has (storeId, page).
-            // FAIL. I need to update api.ts to support search.
-            // For this specific file verify, I will rely on the fact I will update api.ts again or just use a slightly different implementation here.
-
-            // Let's stick to the plan: use contactsApi.
-            // I will update contactsApi in api.ts to include search support in a moment.
-            const data = await contactsApi.getAll(currentStore.id, 1)
             setContacts(data.contacts || [])
             setPagination(data.pagination || { page: 1, pages: 1, total: 0 })
         } catch (error) {
