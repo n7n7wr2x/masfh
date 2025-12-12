@@ -302,9 +302,15 @@ class WhatsAppService {
      * Verify webhook from Meta
      */
     verifyWebhook(mode, token, challenge) {
-        if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+        // Allow a default token if env var is not set, to ease setup
+        const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'salla_whatsapp_default_token';
+
+        if (mode === 'subscribe' && token === verifyToken) {
+            console.log('✅ Webhook verified successfully');
             return challenge;
         }
+
+        console.error('❌ Webhook verification failed. Token mismatch.');
         return null;
     }
 

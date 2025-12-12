@@ -21,6 +21,10 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         value: https://update-me-after-deploy.onrender.com
+      - key: WHATSAPP_VERIFY_TOKEN
+        value: salla_whatsapp_default_token
+      - key: WHATSAPP_APP_SECRET
+        value: change_me_in_dashboard
       # Placeholder vars - You must update these in dashboard
       - key: SALLA_CLIENT_ID
         value: change_me_in_dashboard
