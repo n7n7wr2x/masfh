@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, Loader2, Check } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
+import { plansApi } from '@/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 interface PlanForm {
@@ -62,10 +63,7 @@ export default function NewPlanPage() {
 
     const fetchPlan = async () => {
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/plans/all`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const plans = await response.json()
+            const plans = await plansApi.getAll()
             const plan = plans.find((p: any) => p.id === editId)
 
             if (plan) {
@@ -98,22 +96,12 @@ export default function NewPlanPage() {
         setSaving(true)
 
         try {
-            const url = editId
-                ? `${process.env.NEXT_PUBLIC_API_URL}/plans/${editId}`
-                : `${process.env.NEXT_PUBLIC_API_URL}/plans`
-
-            const response = await fetch(url, {
-                method: editId ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            })
-
-            if (response.ok) {
-                router.push('/dashboard/admin/plans')
+            if (editId) {
+                await plansApi.update(editId, formData)
+            } else {
+                await plansApi.create(formData)
             }
+            router.push('/dashboard/admin/plans')
         } catch (error) {
             console.error('Failed to save plan:', error)
         } finally {

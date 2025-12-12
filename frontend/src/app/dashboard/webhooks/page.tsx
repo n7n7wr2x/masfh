@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store';
+import { adminApi } from '@/lib/api';
 
 interface WebhookLog {
     id: string;
@@ -32,22 +33,9 @@ export default function WebhooksPage() {
     const fetchWebhooks = async (page = 1) => {
         try {
             setLoading(true);
-            const params = new URLSearchParams({
-                page: page.toString(),
-                limit: '20',
-                ...(filter.source && { source: filter.source }),
-                ...(filter.event && { event: filter.event })
-            });
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/webhooks?${params}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setWebhooks(data.webhooks);
-                setPagination(data.pagination);
-            }
+            const data = await adminApi.getWebhooks(page, 20, filter.source, filter.event);
+            setWebhooks(data.webhooks);
+            setPagination(data.pagination);
         } catch (error) {
             console.error('Error fetching webhooks:', error);
         } finally {
@@ -59,10 +47,7 @@ export default function WebhooksPage() {
         if (!confirm('هل أنت متأكد من حذف جميع السجلات؟')) return;
 
         try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/webhooks`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await adminApi.clearWebhooks();
             fetchWebhooks();
         } catch (error) {
             console.error('Error clearing logs:', error);

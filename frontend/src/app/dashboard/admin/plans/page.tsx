@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { CreditCard, Plus, Edit2, Trash2, Loader2, MessageSquare, FileText, Megaphone } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
+import { plansApi } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 interface Plan {
@@ -39,10 +40,7 @@ export default function AdminPlansPage() {
 
     const fetchPlans = async () => {
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/plans/all`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const data = await response.json()
+            const data = await plansApi.getAll()
             setPlans(data)
         } catch (error) {
             console.error('Failed to fetch plans:', error)
@@ -55,10 +53,7 @@ export default function AdminPlansPage() {
         if (!confirm('هل تريد حذف هذه الباقة؟')) return
 
         try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/plans/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
+            await plansApi.delete(id)
             fetchPlans()
         } catch (error) {
             console.error('Failed to delete plan:', error)

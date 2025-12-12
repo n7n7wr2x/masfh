@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { MessageSquare, Search, Send, User, Clock, Check, CheckCheck, AlertCircle, Plus, Archive, ArchiveRestore, FileText, Loader2 } from 'lucide-react'
 import { useAuthStore, useStoreStore } from '@/lib/store'
+import { conversationsApi } from '@/lib/api'
 
 interface Message {
     id: string
@@ -62,12 +63,9 @@ export default function InboxPage() {
     }
 
     const fetchConversations = async () => {
+        if (!currentStore?.id) return
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/conversations/${currentStore?.id}?archived=${showArchived}`,
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            )
-            const data = await response.json()
+            const data = await conversationsApi.getAll(currentStore.id, showArchived)
             // Ensure data is an array
             if (Array.isArray(data)) {
                 setConversations(data)
@@ -83,12 +81,9 @@ export default function InboxPage() {
     }
 
     const fetchMessages = async (conversationId: string) => {
+        if (!currentStore?.id) return
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/conversations/${currentStore?.id}/${conversationId}`,
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            )
-            const data = await response.json()
+            const data = await conversationsApi.getOne(currentStore.id, conversationId)
             setMessages(data.messages || [])
             setSelectedConv(data)
 
@@ -102,28 +97,15 @@ export default function InboxPage() {
     }
 
     const handleSendMessage = async () => {
-        if (!newMessage.trim() || !selectedConv) return
+        if (!newMessage.trim() || !selectedConv || !currentStore?.id) return
 
         setSending(true)
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/conversations/${currentStore?.id}/${selectedConv.id}/send`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ content: newMessage, type: 'text' })
-                }
-            )
+            const message = await conversationsApi.sendMessage(currentStore.id, selectedConv.id, newMessage)
 
-            if (response.ok) {
-                const message = await response.json()
-                setMessages(prev => [...prev, message])
-                setNewMessage('')
-                fetchConversations() // Refresh list
-            }
+            setMessages(prev => [...prev, message])
+            setNewMessage('')
+            fetchConversations() // Refresh list
         } catch (error) {
             console.error('Failed to send message:', error)
         } finally {
@@ -132,34 +114,21 @@ export default function InboxPage() {
     }
 
     const handleStartNewChat = async () => {
-        if (!newChatPhone.trim()) return
+        if (!newChatPhone.trim() || !currentStore?.id) return
 
         setSending(true)
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/conversations/${currentStore?.id}/new`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        customerPhone: newChatPhone,
-                        customerName: newChatName,
-                        templateName: 'hello_world' // Default template for new conversations
-                    })
-                }
-            )
+            const { conversation } = await conversationsApi.startLikely(currentStore.id, {
+                customerPhone: newChatPhone,
+                customerName: newChatName,
+                templateName: 'hello_world'
+            })
 
-            if (response.ok) {
-                const { conversation } = await response.json()
-                setShowNewChat(false)
-                setNewChatPhone('')
-                setNewChatName('')
-                fetchConversations()
-                fetchMessages(conversation.id)
-            }
+            setShowNewChat(false)
+            setNewChatPhone('')
+            setNewChatName('')
+            fetchConversations()
+            fetchMessages(conversation.id)
         } catch (error) {
             console.error('Failed to start conversation:', error)
         } finally {
@@ -168,18 +137,9 @@ export default function InboxPage() {
     }
 
     const handleArchive = async (conversationId: string, archive: boolean) => {
+        if (!currentStore?.id) return
         try {
-            await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/conversations/${currentStore?.id}/${conversationId}/archive`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ archived: archive })
-                }
-            )
+            await conversationsApi.archive(currentStore.id, conversationId, archive)
             fetchConversations()
             if (selectedConv?.id === conversationId) {
                 setSelectedConv(null)

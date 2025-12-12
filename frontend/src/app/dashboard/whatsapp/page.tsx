@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { MessageCircle, CheckCircle2, XCircle, Loader2, Save, ExternalLink, Eye, EyeOff, Send, Unplug } from 'lucide-react'
 import { useAuthStore, useStoreStore } from '@/lib/store'
+import { whatsappApi } from '@/lib/api'
 
 export default function WhatsAppSettingsPage() {
     const { token } = useAuthStore()
@@ -38,12 +39,9 @@ export default function WhatsAppSettingsPage() {
     }, [currentStore])
 
     const fetchStatus = async () => {
+        if (!currentStore?.id) return
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/whatsapp/status/${currentStore?.id}`,
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            )
-            const data = await response.json()
+            const data = await whatsappApi.getStatus(currentStore.id)
             setStatus(data)
 
             if (data.connected) {
@@ -66,25 +64,10 @@ export default function WhatsAppSettingsPage() {
         setTestResult(null)
 
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/whatsapp/connect/${currentStore?.id}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(formData)
-                }
-            )
+            await whatsappApi.connect(currentStore.id, formData)
 
-            if (response.ok) {
-                setTestResult({ success: true, message: 'تم ربط واتساب بنجاح!' })
-                fetchStatus()
-            } else {
-                const error = await response.json()
-                setTestResult({ success: false, message: error.error || 'فشل الربط' })
-            }
+            setTestResult({ success: true, message: 'تم ربط واتساب بنجاح!' })
+            fetchStatus()
         } catch (error) {
             setTestResult({ success: false, message: 'حدث خطأ في الاتصال' })
         } finally {
@@ -97,13 +80,7 @@ export default function WhatsAppSettingsPage() {
 
         setSaving(true)
         try {
-            await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/whatsapp/disconnect/${currentStore?.id}`,
-                {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                }
-            )
+            await whatsappApi.disconnect(currentStore.id)
             setFormData({ phoneNumberId: '', businessAccountId: '', accessToken: '' })
             fetchStatus()
         } catch (error) {
@@ -123,28 +100,8 @@ export default function WhatsAppSettingsPage() {
         setTestResult(null)
 
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/whatsapp/send/${currentStore?.id}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        phone: testPhone,
-                        templateName: 'hello_world', // Default Meta test template
-                        variables: []
-                    })
-                }
-            )
-
-            if (response.ok) {
-                setTestResult({ success: true, message: 'تم إرسال رسالة الاختبار!' })
-            } else {
-                const error = await response.json()
-                setTestResult({ success: false, message: error.error || 'فشل الإرسال' })
-            }
+            await whatsappApi.sendTest(currentStore.id, testPhone, 'hello_world')
+            setTestResult({ success: true, message: 'تم إرسال رسالة الاختبار!' })
         } catch (error) {
             setTestResult({ success: false, message: 'حدث خطأ في الإرسال' })
         } finally {

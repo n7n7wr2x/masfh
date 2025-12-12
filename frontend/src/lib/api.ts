@@ -253,6 +253,118 @@ export const adminApi = {
     getOrders: async (limit = 100) => {
         const { data } = await api.get(`/admin/orders?limit=${limit}`)
         return data
+    },
+
+    getWebhooks: async (page = 1, limit = 20, source?: string, event?: string) => {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: limit.toString(),
+            ...(source && { source }),
+            ...(event && { event })
+        })
+        const { data } = await api.get(`/admin/webhooks?${params}`)
+        return data
+    },
+
+    clearWebhooks: async () => {
+        const { data } = await api.delete('/admin/webhooks')
+        return data
+    }
+}
+
+// Plans API (Admin)
+export const plansApi = {
+    getAll: async () => {
+        const { data } = await api.get('/plans/all') // Corrected endpoint based on usage
+        return data
+    },
+
+    getOne: async (planId: string) => {
+        const { data } = await api.get(`/plans/${planId}`)
+        return data
+    },
+
+    create: async (plan: any) => {
+        const { data } = await api.post('/plans', plan)
+        return data
+    },
+
+    update: async (planId: string, updates: any) => {
+        const { data } = await api.put(`/plans/${planId}`, updates)
+        return data
+    },
+
+    delete: async (planId: string) => {
+        const { data } = await api.delete(`/plans/${planId}`)
+        return data
+    }
+}
+
+// Contacts API
+export const contactsApi = {
+    getAll: async (storeId: string, page = 1, search?: string) => {
+        const query = search ? `&search=${encodeURIComponent(search)}` : ''
+        const { data } = await api.get(`/contacts/${storeId}?page=${page}${query}`)
+        return data
+    },
+
+    sync: async (storeId: string) => {
+        const { data } = await api.post(`/contacts/${storeId}/sync`)
+        return data
+    },
+
+    create: async (storeId: string, contact: any) => {
+        const { data } = await api.post(`/contacts/${storeId}`, contact)
+        return data
+    },
+
+    update: async (storeId: string, contactId: string, updates: any) => {
+        const { data } = await api.put(`/contacts/${storeId}/${contactId}`, updates)
+        return data
+    },
+
+    delete: async (storeId: string, contactId: string) => {
+        const { data } = await api.delete(`/contacts/${storeId}/${contactId}`)
+        return data
+    },
+
+    block: async (storeId: string, contactId: string, blocked: boolean) => {
+        const { data } = await api.post(`/contacts/${storeId}/${contactId}/block`, { blocked })
+        return data
+    },
+
+    import: async (storeId: string, contacts: any[]) => {
+        const { data } = await api.post(`/contacts/${storeId}/import`, { contacts })
+        return data
+    }
+}
+
+// Conversations API
+export const conversationsApi = {
+    getAll: async (storeId: string, archived = false) => {
+        const { data } = await api.get(`/conversations/${storeId}?archived=${archived}`)
+        return data
+    },
+
+    getOne: async (storeId: string, conversationId: string) => {
+        const { data } = await api.get(`/conversations/${storeId}/${conversationId}`)
+        return data
+    },
+
+    sendMessage: async (storeId: string, conversationId: string, content: string, type = 'text') => {
+        const { data } = await api.post(`/conversations/${storeId}/${conversationId}/send`, { content, type })
+        return data
+    },
+
+    startLikely: async (storeId: string, payload: any) => {
+        // payload: { customerPhone, customerName, templateName }
+        const { data } = await api.post(`/conversations/${storeId}/new`, payload)
+        return data
+    },
+
+    archive: async (storeId: string, conversationId: string, archived: boolean) => {
+        const { data } = await api.post(`/conversations/${storeId}/${conversationId}/archive`, { archived })
+        return data
     }
 }
 

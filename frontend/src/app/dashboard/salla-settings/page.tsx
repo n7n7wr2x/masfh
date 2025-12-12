@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Store, CheckCircle2, XCircle, RefreshCw, Calendar, Shield } from 'lucide-react'
 import { useAuthStore, useStoreStore } from '@/lib/store'
+import { storesApi } from '@/lib/api'
 
 export default function SallaSettingsPage() {
     const { token } = useAuthStore()
@@ -21,12 +22,7 @@ export default function SallaSettingsPage() {
         const fetchStoreDetails = async () => {
             if (currentStore?.id && token) {
                 try {
-                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/stores/${currentStore.id}`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    })
-                    const data = await response.json()
+                    const data = await storesApi.getOne(currentStore.id)
                     console.log('Store details:', data)
                     setStoreInfo(data)
                 } catch (error) {
