@@ -60,6 +60,8 @@ export default function WhatsAppSettingsPage() {
 
     const handleConnect = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!currentStore?.id) return
+
         setSaving(true)
         setTestResult(null)
 
@@ -77,6 +79,7 @@ export default function WhatsAppSettingsPage() {
 
     const handleDisconnect = async () => {
         if (!confirm('هل تريد فصل واتساب؟ سيتوقف إرسال الإشعارات.')) return
+        if (!currentStore?.id) return
 
         setSaving(true)
         try {
@@ -95,6 +98,7 @@ export default function WhatsAppSettingsPage() {
             setTestResult({ success: false, message: 'أدخل رقم الهاتف للاختبار' })
             return
         }
+        if (!currentStore?.id) return
 
         setTesting(true)
         setTestResult(null)
