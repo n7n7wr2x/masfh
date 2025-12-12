@@ -52,6 +52,7 @@ app.use('/api/', limiter);
 // Body parsing middleware
 app.use(express.json({
   verify: (req, res, buf) => {
+    console.log('📦 [Middleware] Raw body captured, size:', buf.length);
     req.rawBody = buf;
   }
 }));
