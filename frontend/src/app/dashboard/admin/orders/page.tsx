@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Package, Loader2, RefreshCw, Store, Phone, Mail, Calendar, DollarSign } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
+import { adminApi } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 interface Order {
@@ -60,12 +61,7 @@ export default function AdminOrdersPage() {
     const fetchOrders = async () => {
         setLoading(true)
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/orders?limit=100`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            const data = await response.json()
+            const data = await adminApi.getOrders()
             setOrders(data.orders || [])
         } catch (error) {
             console.error('Failed to fetch orders:', error)

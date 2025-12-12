@@ -248,6 +248,11 @@ export const adminApi = {
     getAnalytics: async (period = '7d') => {
         const { data } = await api.get(`/admin/analytics?period=${period}`)
         return data
+    },
+
+    getOrders: async (limit = 100) => {
+        const { data } = await api.get(`/admin/orders?limit=${limit}`)
+        return data
     }
 }
 
