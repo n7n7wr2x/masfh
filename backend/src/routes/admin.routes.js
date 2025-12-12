@@ -272,13 +272,20 @@ router.get('/analytics', authenticate, requireSuperAdmin, asyncHandler(async (re
 router.get('/orders', authenticate, requireSuperAdmin, asyncHandler(async (req, res) => {
     const { page = 1, limit = 50, status, storeId } = req.query;
 
+    console.log('📦 [DEBUG] Fetching orders with query:', { page, limit, status, storeId });
+
     const where = {
         ...(status && { status }),
         ...(storeId && { storeId })
     };
 
-    const [orders, total] = await Promise.all([
-        prisma.order.findMany({
+    console.log('📦 [DEBUG] Order Where Clause:', where);
+
+    try {
+        const totalCount = await prisma.order.count({ where });
+        console.log('📦 [DEBUG] Total Orders Count:', totalCount);
+
+        const orders = await prisma.order.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             skip: (page - 1) * limit,
@@ -288,19 +295,26 @@ router.get('/orders', authenticate, requireSuperAdmin, asyncHandler(async (req, 
                     select: { name: true, sallaStoreId: true }
                 }
             }
-        }),
-        prisma.order.count({ where })
-    ]);
+        });
 
-    res.json({
-        orders,
-        pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / limit)
+        console.log('📦 [DEBUG] Orders Found:', orders.length);
+        if (orders.length > 0) {
+            console.log('📦 [DEBUG] First Order Sample:', JSON.stringify(orders[0], null, 2));
         }
-    });
+
+        res.json({
+            orders,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: totalCount,
+                pages: Math.ceil(totalCount / limit)
+            }
+        });
+    } catch (error) {
+        console.error('❌ [DEBUG] Error fetching orders:', error);
+        res.status(500).json({ error: 'Failed to fetch orders' });
+    }
 }));
 
 /**
