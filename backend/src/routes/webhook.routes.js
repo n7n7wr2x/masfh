@@ -44,13 +44,16 @@ router.post('/whatsapp', asyncHandler(async (req, res) => {
 /**
  * Verify Salla webhook signature
  */
-function verifySallaSignature(payload, signature) {
+function verifySallaSignature(req, signature) {
     const secret = process.env.SALLA_WEBHOOK_SECRET;
-    if (!secret || !signature) return false;
+    // Fallback to stringify if rawBody is missing (e.g. testing) although rawBody is preferred
+    const payload = req.rawBody || JSON.stringify(req.body);
+
+    if (!secret || !signature || !payload) return false;
 
     const computed = crypto
         .createHmac('sha256', secret)
-        .update(JSON.stringify(payload))
+        .update(payload)
         .digest('hex');
 
     return crypto.timingSafeEqual(
@@ -90,7 +93,8 @@ router.post('/salla', asyncHandler(async (req, res) => {
     const signature = req.headers['x-salla-signature'];
 
     if (process.env.NODE_ENV === 'production') {
-        if (!verifySallaSignature(req.body, signature)) {
+        if (!verifySallaSignature(req, signature)) {
+            console.error('Invalid Salla Signature');
             return res.status(401).json({ error: 'Invalid signature' });
         }
     }
