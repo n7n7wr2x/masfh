@@ -49,17 +49,30 @@ function verifySallaSignature(req, signature) {
     // Fallback to stringify if rawBody is missing (e.g. testing) although rawBody is preferred
     const payload = req.rawBody || JSON.stringify(req.body);
 
-    if (!secret || !signature || !payload) return false;
+    console.log('🔍 [DEBUG] Verifying Salla Signature:');
+    console.log(`   - Secret exists: ${!!secret}`);
+    console.log(`   - Signature received: ${signature}`);
+    console.log(`   - Payload source: ${req.rawBody ? 'rawBody (Buffer)' : 'JSON.stringify (Fallback)'}`);
+
+    if (!secret || !signature || !payload) {
+        console.error('❌ Missing secret, signature, or payload');
+        return false;
+    }
 
     const computed = crypto
         .createHmac('sha256', secret)
         .update(payload)
         .digest('hex');
 
-    return crypto.timingSafeEqual(
+    console.log(`   - Computed signature: ${computed}`);
+
+    const isValid = crypto.timingSafeEqual(
         Buffer.from(signature),
         Buffer.from(computed)
     );
+    console.log(`   - Result: ${isValid ? '✅ MATCH' : '❌ MISMATCH'}`);
+
+    return isValid;
 }
 
 /**
