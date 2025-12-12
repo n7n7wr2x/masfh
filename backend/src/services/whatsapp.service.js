@@ -311,21 +311,194 @@ class WhatsAppService {
     /**
      * Process incoming webhook
      */
-    async processWebhook(payload) {
-        // Handle message status updates
-        if (payload.entry?.[0]?.changes?.[0]?.value?.statuses) {
-            const statuses = payload.entry[0].changes[0].value.statuses;
+    /**
+     * Handle incoming message
+     */
+    async handleIncomingMessage(store, message, contactInfo) {
+        try {
+            const customerPhone = message.from; // e.g. 966512345678
+            const customerName = contactInfo?.profile?.name || message.from;
 
-            for (const status of statuses) {
-                await prisma.notification.updateMany({
-                    where: { whatsappMsgId: status.id },
+            // 1. Find or create Contact
+            // We use upsert to ensure we have the latest info
+            const contact = await prisma.contact.upsert({
+                where: {
+                    storeId_phone: {
+                        storeId: store.id,
+                        phone: customerPhone
+                    }
+                },
+                update: {
+                    name: customerName, // Update name if improved
+                    messagesCount: { increment: 1 },
+                    lastContactAt: new Date()
+                },
+                create: {
+                    storeId: store.id,
+                    phone: customerPhone,
+                    name: customerName,
+                    source: 'whatsapp',
+                    messagesCount: 1,
+                    lastContactAt: new Date()
+                }
+            });
+
+            // 2. Find or create Conversation
+            let conversation = await prisma.conversation.findUnique({
+                where: {
+                    storeId_customerPhone: {
+                        storeId: store.id,
+                        customerPhone: customerPhone
+                    }
+                }
+            });
+
+            if (!conversation) {
+                conversation = await prisma.conversation.create({
                     data: {
-                        status: status.status.toUpperCase(),
-                        ...(status.status === 'delivered' && { deliveredAt: new Date() }),
-                        ...(status.status === 'read' && { readAt: new Date() })
+                        storeId: store.id,
+                        customerPhone: customerPhone,
+                        customerName: customerName,
+                        unreadCount: 1,
+                        lastMessage: this.getMessagePreview(message),
+                        lastMessageAt: new Date()
+                    }
+                });
+            } else {
+                // Update existing conversation
+                await prisma.conversation.update({
+                    where: { id: conversation.id },
+                    data: {
+                        customerName: customerName, // Keep name updated
+                        unreadCount: { increment: 1 },
+                        lastMessage: this.getMessagePreview(message),
+                        lastMessageAt: new Date(),
+                        isArchived: false // Bring back to inbox if archived
                     }
                 });
             }
+
+            // 3. Create Message
+            await prisma.message.create({
+                data: {
+                    conversationId: conversation.id,
+                    direction: 'inbound',
+                    type: message.type,
+                    content: this.getMessageContent(message),
+                    whatsappMsgId: message.id,
+                    status: 'read', // Incoming are implicitly valid/read by system
+                    sentAt: new Date(parseInt(message.timestamp) * 1000)
+                }
+            });
+
+            console.log(`📩 New message processed from ${customerName} (${customerPhone})`);
+
+        } catch (error) {
+            console.error('Error handling incoming message:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Helper to get text content from message object
+     */
+    getMessageContent(message) {
+        try {
+            switch (message.type) {
+                case 'text':
+                    return message.text.body;
+                case 'button':
+                    return message.button.text;
+                case 'interactive':
+                    return message.interactive.button_reply?.title || message.interactive.list_reply?.title;
+                case 'image':
+                    return '[صورة]'; // We can add better media handling later
+                case 'document':
+                    return '[ملف]';
+                case 'audio':
+                    return '[صوت]';
+                case 'video':
+                    return '[فيديو]';
+                case 'sticker':
+                    return '[ملصق]';
+                case 'location':
+                    return '[موقع]';
+                default:
+                    return '[رسالة غير مدعومة]';
+            }
+        } catch (e) {
+            return '[خطأ في قراءة المحتوى]';
+        }
+    }
+
+    /**
+     * Helper to get preview string for conversation list
+     */
+    getMessagePreview(message) {
+        const content = this.getMessageContent(message);
+        return content.length > 50 ? content.substring(0, 50) + '...' : content;
+    }
+
+    /**
+     * Process incoming webhook
+     */
+    async processWebhook(payload) {
+        try {
+            const value = payload.entry?.[0]?.changes?.[0]?.value;
+            if (!value) return { received: true };
+
+            // 1. Handle Messages (Incoming)
+            if (value.messages && value.messages.length > 0) {
+                const phoneNumberId = value.metadata?.phone_number_id;
+
+                if (phoneNumberId) {
+                    // Find store by Phone ID
+                    const store = await prisma.store.findFirst({
+                        where: { whatsappPhoneId: phoneNumberId }
+                    });
+
+                    if (store) {
+                        for (const message of value.messages) {
+                            // Find contact info (name) if available
+                            const contactInfo = value.contacts?.find(c => c.wa_id === message.from);
+                            await this.handleIncomingMessage(store, message, contactInfo);
+                        }
+                    } else {
+                        console.log(`⚠️ Received message for unknown Phone ID: ${phoneNumberId}`);
+                    }
+                }
+            }
+
+            // 2. Handle Status Updates (Outgoing)
+            if (value.statuses) {
+                const statuses = value.statuses;
+
+                for (const status of statuses) {
+                    // Update Notification status
+                    await prisma.notification.updateMany({
+                        where: { whatsappMsgId: status.id },
+                        data: {
+                            status: status.status.toUpperCase(),
+                            ...(status.status === 'delivered' && { deliveredAt: new Date() }),
+                            ...(status.status === 'read' && { readAt: new Date() })
+                        }
+                    });
+
+                    // Update Conversation Message status
+                    const msgStatus = status.status; // sent, delivered, read
+                    await prisma.message.updateMany({
+                        where: { whatsappMsgId: status.id },
+                        data: {
+                            status: msgStatus,
+                            ...(msgStatus === 'delivered' && { deliveredAt: new Date() }),
+                            ...(msgStatus === 'read' && { readAt: new Date() })
+                        }
+                    });
+                }
+            }
+
+        } catch (error) {
+            console.error('Error processing webhook payload:', error);
         }
 
         return { received: true };
