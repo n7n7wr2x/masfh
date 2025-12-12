@@ -116,6 +116,9 @@ router.post('/salla', asyncHandler(async (req, res) => {
 
     console.log(`Salla webhook: ${event}`, JSON.stringify({ merchant, data }, null, 2));
 
+    // Handle merchant ID being either an object or a direct number
+    const merchantId = typeof merchant === 'object' ? merchant?.id : merchant;
+
     // Log webhook to database
     let webhookLog;
     try {
@@ -123,7 +126,7 @@ router.post('/salla', asyncHandler(async (req, res) => {
             data: {
                 source: 'salla',
                 event: event || 'unknown',
-                merchantId: merchant?.id?.toString(),
+                merchantId: merchantId?.toString(),
                 payload: req.body,
                 processed: false
             }
@@ -140,11 +143,11 @@ router.post('/salla', asyncHandler(async (req, res) => {
 
     // Find store by Salla merchant ID
     const store = await prisma.store.findFirst({
-        where: { sallaStoreId: merchant?.id?.toString() }
+        where: { sallaStoreId: merchantId?.toString() }
     });
 
     if (!store) {
-        console.log('Store not found for merchant:', merchant?.id);
+        console.log('Store not found for merchant:', merchantId);
         return res.json({ received: true, processed: false });
     }
 
